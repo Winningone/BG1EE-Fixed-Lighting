@@ -1,0 +1,13 @@
+The included setup-fixed-lighting.exe is an unmodified WeiDU 25100 Windows
+binary, downloaded from the WeiDU maintainers' official release:
+https://github.com/WeiDUorg/weidu/releases/tag/v251.00
+
+WeiDU is developed by Westley Weimer, Valerio Bigiani, Fredrik Lindgren,
+and contributors. The accompanying WEIDU-COPYING.txt contains its license.
+Source: https://github.com/WeiDUorg/weidu
+
+WeiDU documentation permits redistribution of unmodified binary copies
+alongside mods: https://weidu.org/~thebigg/README-WeiDU.html
+
+The mod source in fixed-lighting is a custom prototype for this request.
+No Baldur's Gate game assets are distributed in this archive.

@@ -1,0 +1,75 @@
+BACKUP ~fixed-lighting/backup~
+AUTHOR ~Local custom mod~
+VERSION ~0.1.0-prototype~
+README ~fixed-lighting/README.md~
+
+BEGIN ~Fixed daylight (prototype)~
+SUBCOMPONENT ~Fixed outdoor lighting~
+REQUIRE_PREDICATE GAME_IS ~bgee~ ~This prototype supports BG1 Enhanced Edition only.~
+COPY_EXISTING_REGEXP GLOB ~^.+\.are$~ ~override~
+  PATCH_IF SOURCE_SIZE >= 0x100 BEGIN
+    READ_ASCII 0 signature (8)
+    PATCH_IF (~%signature%~ STRING_EQUAL ~AREAV1.0~) BEGIN
+      READ_SHORT 0x48 area_type
+      PATCH_IF ((area_type BAND 1) != 0 AND (area_type BAND 2) != 0) BEGIN
+        // Clear day/night and extended-night; keep every other area type bit.
+        WRITE_SHORT 0x48 (area_type BAND 0xffbd)
+        PATCH_PRINT ~Fixed daylight: %SOURCE_RES%~
+      END
+    END
+  END
+BUT_ONLY_IF_IT_CHANGES
+
+BEGIN ~Fixed native night artwork (experimental; partial area coverage)~
+SUBCOMPONENT ~Fixed outdoor lighting~
+REQUIRE_PREDICATE GAME_IS ~bgee~ ~This prototype supports BG1 Enhanced Edition only.~
+PRINT ~Night only supports areas with native night WED and light-map resources. Other areas are skipped and keep their normal cycle. Check the installer log for coverage.~
+OUTER_SET fl_index = 0
+COPY_EXISTING_REGEXP GLOB ~^.+\.are$~ ~override~
+  PATCH_IF SOURCE_SIZE >= 0x100 BEGIN
+    READ_ASCII 0 signature (8)
+    PATCH_IF (~%signature%~ STRING_EQUAL ~AREAV1.0~) BEGIN
+      READ_SHORT 0x48 area_type
+      PATCH_IF ((area_type BAND 1) != 0 AND (area_type BAND 2) != 0) BEGIN
+        READ_ASCII 0x08 original_wed (8) NULL
+        PATCH_IF ((STRING_LENGTH ~%original_wed%~) = 6 AND
+                  FILE_EXISTS_IN_GAME ~%original_wed%N.wed~ AND
+                  FILE_EXISTS_IN_GAME ~%original_wed%LN.bmp~ AND
+                  FILE_EXISTS_IN_GAME ~%original_wed%SR.bmp~ AND
+                  FILE_EXISTS_IN_GAME ~%original_wed%HT.bmp~) BEGIN
+          // Clone instead of replacing shared original map resources.
+          INNER_ACTION BEGIN
+            OUTER_SET fl_index += 1
+            // Four-digit padding keeps resource names within the 8-byte limit.
+            OUTER_SPRINT fl_number ~%fl_index%~
+            OUTER_SPRINT private_wed ~ZL~
+            OUTER_SET fl_padding = 4 - STRING_LENGTH ~%fl_number%~
+            OUTER_WHILE fl_padding > 0 BEGIN
+              OUTER_SPRINT private_wed ~%private_wed%0~
+              OUTER_SET fl_padding -= 1
+            END
+            OUTER_SPRINT private_wed ~%private_wed%%fl_number%~
+            ACTION_IF fl_index > 9999 BEGIN
+              FAIL ~Too many maps for this prototype's private resource namespace.~
+            END
+            ACTION_IF (FILE_EXISTS_IN_GAME ~%private_wed%.wed~ OR
+                       FILE_EXISTS_IN_GAME ~%private_wed%LM.bmp~ OR
+                       FILE_EXISTS_IN_GAME ~%private_wed%SR.bmp~ OR
+                       FILE_EXISTS_IN_GAME ~%private_wed%HT.bmp~) BEGIN
+              FAIL ~Private resource collision: %private_wed%. Uninstall conflicting resources before retrying.~
+            END
+            COPY_EXISTING ~%original_wed%N.wed~ ~override/%private_wed%.wed~
+            COPY_EXISTING ~%original_wed%LN.bmp~ ~override/%private_wed%LM.bmp~
+            COPY_EXISTING ~%original_wed%SR.bmp~ ~override/%private_wed%SR.bmp~
+            COPY_EXISTING ~%original_wed%HT.bmp~ ~override/%private_wed%HT.bmp~
+          END
+          WRITE_ASCIIE 0x08 ~%private_wed%~ #8
+          WRITE_SHORT 0x48 (area_type BAND 0xffbd)
+          PATCH_PRINT ~Fixed native night: %SOURCE_RES% (%original_wed% -> %private_wed%)~
+        END ELSE BEGIN
+          PATCH_PRINT ~Night SKIPPED: %SOURCE_RES% -- native night resources unavailable or unsupported WED name.~
+        END
+      END
+    END
+  END
+BUT_ONLY_IF_IT_CHANGES
